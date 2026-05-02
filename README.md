@@ -1,81 +1,69 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/SHM9MYZJ)
 # Valura AI — Team Lead Project Assignment
 
-You have been given access to this repository as part of the Valura AI team lead hiring process.
+This is the implementation of the Valura AI microservice.
 
-**Read [`ASSIGNMENT.md`](ASSIGNMENT.md) in full before writing a single line of code.**
+## Setup Instructions
 
----
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Poornachandra-dh/Valura-ai.git
+   cd Valura-ai
+   ```
 
-## What you're building
+2. **Create a virtual environment and install dependencies:**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate        # Linux/macOS
+   venv\Scripts\activate           # Windows
+   pip install -r requirements.txt
+   ```
 
-An AI agent ecosystem that helps a novice investor **build, monitor, grow, and protect** their portfolio. See [`ASSIGNMENT.md`](ASSIGNMENT.md) for the full mission, scope, and constraints.
+3. **Environment Variables:**
+   You must provide API keys to run the AI agents. Create a `.env` file in the root directory:
+   ```env
+   OPENAI_API_KEY=your_openai_api_key
+   # If you prefer to use Gemini's OpenAI compatibility, set:
+   # GEMINI_API_KEY=your_gemini_api_key
+   CLASSIFIER_MODEL=gpt-4o-mini
+   ```
 
----
+4. **Running the Server:**
+   ```bash
+   uvicorn src.main:app --reload
+   ```
 
-## Setup
+5. **Running Tests:**
+   ```bash
+   pytest tests/ -v
+   ```
+   Tests use a mock LLM setup to run without requiring an API key.
 
-**Requirements:** Python 3.11+, an OpenAI API key.
+## Architecture and Decisions
 
-**Persistence is your choice.** Postgres, SQLite, or in-memory — pick one and defend it in your README. `DATABASE_URL` in `.env.example` is optional.
+- **Safety Guard (`src/safety.py`)**: 
+  - Synchronous, fast regex-based evaluation of user intents. Evaluates and completes in less than 10ms without any LLM network calls.
+  - Distinct responses are crafted specifically around personal actions (e.g., "tell me to buy") to pass-through educational queries ("what is") safely.
 
-**Streaming is required.** SSE only. Use `sse-starlette`, FastAPI's `StreamingResponse`, or roll your own — your call.
+- **Intent Classifier (`src/classifier.py`)**: 
+  - Uses OpenAI's Structured Outputs (`response_format=ClassificationResult`) to return exact intents and entities.
+  - The fallback mechanism supports testing locally even without an OpenAI key, by optionally falling back to Google Gemini's OpenAI compatibility endpoint.
 
-```bash
-git clone <your-classroom-repo-url>
-cd <repo-name>
+- **Router (`src/router.py`)**: 
+  - Clean separation: routes to the real agent when implemented or returns a graceful stub message with classified entities.
 
-python -m venv venv
-source venv/bin/activate        # Linux/macOS
-venv\Scripts\activate           # Windows
+- **Portfolio Health Agent (`src/agents/portfolio_health.py`)**: 
+  - Fetches live data via `yfinance` to evaluate portfolio values and compares it to average cost for realistic ROI.
+  - LLM receives a synthesized prompt containing numeric calculations to produce accurate, plain-language insights (preventing hallucinations).
+  - Designed gracefully to handle `user_004` (Empty Portfolio) by reverting to a BUILD strategy instead of calculating metrics.
 
-pip install -r requirements.txt
+- **HTTP Layer (`src/main.py`)**:
+  - Exposes `POST /chat` with a strict Server-Sent Events (SSE) streaming output.
+  - Implements an asynchronous 15-second timeout for streaming robustness.
+  - **Memory Persistence**: Sessions are stored in a simple Python dictionary mapping `session_id` to conversational history to prioritize speed and low setup overhead.
 
-cp .env.example .env
-# Fill in OPENAI_API_KEY
-```
+## Stretch Goals Addressed
+- **Per-tenant model selection**: Configurable via `CLASSIFIER_MODEL` environment variable.
 
-Use `gpt-4o-mini` while developing to keep costs down. Evaluation runs against `gpt-4.1`.
+## Video Presentation
 
----
-
-## Running Tests
-
-```bash
-pytest tests/ -v
-```
-
-Tests must pass without an `OPENAI_API_KEY` set — mock the LLM. We will run `pytest tests/ -v` on your repo.
-
----
-
-## Repository Structure
-
-When you submit, your repository must contain:
-
-```
-README.md   ← overwrite this with your own (setup, decisions, library choices, video link)
-src/        ← all code
-tests/      ← all tests, must pass with pytest
-```
-
-`fixtures/`, `pytest.ini`, `requirements.txt`, `.env.example`, and `.github/` are part of the scaffold — leave them in place. Do not delete `ASSIGNMENT.md`.
-
----
-
-## Submission
-
-- Push commits **throughout** your work — we read the git log
-- Your `README.md` must:
-  - Explain how to run your code
-  - List every required environment variable
-  - Document the non-obvious decisions you made
-  - Link your defence video (≤ 10 min — see `ASSIGNMENT.md`)
-- Deadline: **3 days** from the date you accepted this assignment
-- Defence video: due within **24 hours** of your final commit
-
----
-
-## Environment
-
-You self-host everything. We do not provide credentials. See `.env.example` for the variables you'll need.
+*(Please insert your unlisted YouTube video URL here before submission)*
